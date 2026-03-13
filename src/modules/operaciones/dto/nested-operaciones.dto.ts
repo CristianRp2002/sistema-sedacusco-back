@@ -1,10 +1,14 @@
-import { IsString, IsNumber, IsUUID, IsOptional, IsEnum, IsMilitaryTime, Min } from 'class-validator';
+import { IsString, IsNumber, IsUUID, IsOptional, IsEnum, IsMilitaryTime, Min, Matches } from 'class-validator';
 import { MomentoVerificacion } from '../entities/verificacion-tablero.entity';
 
 // 1. Valida a los operadores y sus turnos
 export class TurnoOperadorDto {
-  @IsUUID('4', { message: 'El ID del usuario debe ser un UUID válido' })
-  usuario_id: string;
+
+  @IsString({ message: 'El nombre del operador debe ser texto' })
+  @Matches(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/, {
+    message: 'El nombre del operador solo puede contener letras, sin números ni caracteres especiales'
+  })
+  nombre_operador: string;
 
   @IsNumber({}, { message: 'El turno debe ser un número' })
   @Min(1, { message: 'El turno debe ser al menos 1' })
@@ -13,18 +17,19 @@ export class TurnoOperadorDto {
 
 // 2. Valida las horas de encendido de las bombas
 export class DetalleBombeoDto {
+
   @IsUUID('all', { message: 'El ID de la bomba debe ser un UUID válido' })
   bomba_id: string;
-   
+
   @IsString()
-  @IsMilitaryTime({ 
-    message: 'La hora debe ser un formato de 24 horas válido (HH:mm)' 
+  @IsMilitaryTime({
+    message: 'La hora de encendido debe ser formato 24h válido (HH:mm)'
   })
   encendido: string;
 
   @IsString()
-  @IsMilitaryTime({ 
-    message: 'La hora debe ser un formato de 24 horas válido (HH:mm)' 
+  @IsMilitaryTime({
+    message: 'La hora de apagado debe ser formato 24h válido (HH:mm)'
   })
   apagado: string;
 
@@ -41,13 +46,32 @@ export class DetalleBombeoDto {
 
 // 3. Valida los checks de los tableros
 export class VerificacionTableroDto {
+
   @IsUUID('all', { message: 'El ID del tablero debe ser un UUID válido' })
   tablero_id: string;
 
-  @IsEnum(MomentoVerificacion, { message: 'El momento debe ser HABILITACION o DESACTIVACION' })
+  @IsEnum(MomentoVerificacion, {
+    message: 'El momento debe ser HABILITACION o DESACTIVACION'
+  })
   momento: MomentoVerificacion;
 
-  @IsString({ message: 'El estado del interruptor debe ser un texto descriptivo' })
+  @IsString()
   @IsOptional()
   interruptor_estado?: string;
+
+  @IsString()
+  @IsOptional()
+  selector_estado?: string;
+
+  @IsString()
+  @IsOptional()
+  parada_emergencia_estado?: string;
+
+  @IsString()
+  @IsOptional()
+  variador_estado?: string;
+
+  @IsString()
+  @IsOptional()
+  alarma_estado?: string;
 }

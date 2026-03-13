@@ -40,15 +40,16 @@ export class EstacionesController {
     return this.estacionRepo.delete(id);
   }
 
-  // BOMBAS
   @Post(':id/bombas')
-  crearBomba(@Param('id') estacionId: string, @Body() body: { nombre: string }) {
-    const bomba = this.bombaRepo.create({
-      nombre: body.nombre,
-      estacion: { id: estacionId } as any
-    });
-    return this.bombaRepo.save(bomba);
-  }
+crearBomba(@Param('id') estacionId: string, @Body() body: { nombre: string, numero_serie: string, tipo: string, activa: boolean }) {
+  const bomba = this.bombaRepo.create({
+    nombre: body.nombre,
+    numero_serie: body.numero_serie,
+    activa: body.activa ?? true,
+    estacion: { id: estacionId } as any
+  });
+  return this.bombaRepo.save(bomba);
+}
 
   @Patch('bombas/:id')
   actualizarBomba(@Param('id') id: string, @Body() body: any) {

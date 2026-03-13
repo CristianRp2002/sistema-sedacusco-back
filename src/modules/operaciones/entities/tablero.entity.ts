@@ -7,10 +7,13 @@ export class Tablero {
   id: string;
 
   @Column({ type: 'varchar', length: 100 })
-  nombre: string; // Ej: "Tablero General", "Tablero Bomba 1"
+  nombre: string; // Ej: "Tabler  o General", "Tablero Bomba 1"
 
   @Column({ type: 'varchar', length: 50, nullable: true })
   tipo: string; // Opcional: Para diferenciar si es de control, telemetría, etc.
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  numero_serie: string;
 
   @ManyToOne(() => Estacion)
   @JoinColumn({ name: 'estacion_id' })

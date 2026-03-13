@@ -11,6 +11,9 @@ export class Bomba {
 
   @Column({ type: 'boolean', default: true })
   activa: boolean;
+  
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  numero_serie: string;
 
   @ManyToOne(() => Estacion, (estacion) => estacion.bombas)
   estacion: Estacion;

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete,ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, Query } from '@nestjs/common';
 import { OperacionesService } from './operaciones.service';
 import { CreateOperacionesDto } from './dto/create-operaciones.dto';
 import { UpdateOperacionesDto } from './dto/update-operaciones.dto';
@@ -13,8 +13,12 @@ export class OperacionesController {
   }
 
   @Get()
-  findAll() {
-    return this.operacionesService.findAll();
+  findAll(
+    @Query('mes') mes?: string,
+    @Query('anio') anio?: string,
+    @Query('estacion_id') estacionId?: string,
+  ) {
+    return this.operacionesService.findAll({ mes, anio, estacionId });
   }
 
   @Get(':id')

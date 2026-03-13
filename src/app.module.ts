@@ -13,9 +13,11 @@ import { OperacionesModule } from './modules/operaciones/operaciones.module';
 import { UsersModule } from './modules/users/users.module'; 
 import { RolesModule } from './modules/roles/roles.module'; 
 import { AuthModule } from './modules/auth/auth.module';
+import { PdfModule } from './pdf/pdf.module';
 
 @Module({
   imports: [
+    PdfModule,
     // 1. Configuración Global
     ConfigModule.forRoot({
       isGlobal: true,

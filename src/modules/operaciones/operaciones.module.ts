@@ -29,6 +29,6 @@ import { ParteDiarioOperador } from './entities/parte-diario-operador.entity';
   ],
   controllers: [OperacionesController, EstacionesController],
   providers: [OperacionesService],
-  exports: [OperacionesService]
+  exports: [OperacionesService, TypeOrmModule]
 })
 export class OperacionesModule {}
