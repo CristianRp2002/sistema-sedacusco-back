@@ -9,6 +9,8 @@ import { LecturaTrifasica } from './lectura-trifasica.embedded';
 import { LecturaHidraulica } from './lectura-hidraulica.embedded'; 
 import { CondicionOperativa } from './condicion-operativa.embedded';
 import { TurnoOperador } from './turno-operador.entity';
+import { RegistroActivo } from './registro-activo.entity';
+import { ValorRegistro } from './valor-registro.entity';
 
 @Entity('partes_diarios')
 export class ParteDiario {
@@ -64,10 +66,10 @@ export class ParteDiario {
   fecha_hora_lectura_final: Date;
   
   // --- SECCIÓN V: LECTURAS FINALES (HIDRÁULICAS) ---
-  @Column({ type: 'decimal', precision: 5, scale: 2 })
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   nivel_cisterna_final: number; 
 
-  @Column({ type: 'decimal', precision: 5, scale: 2 })
+  @Column({ type: 'decimal', precision: 5, scale: 2,  nullable: true  })
   presion_linea_final: number; 
 
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
@@ -89,4 +91,10 @@ export class ParteDiario {
 
   @OneToMany(() => TurnoOperador, (turno) => turno.parteDiario, { cascade: true })
   operadores: TurnoOperador[];
+
+  @OneToMany(() => RegistroActivo, (r) => r.parteDiario, { cascade: true })
+registrosActivo: RegistroActivo[];
+
+@OneToMany(() => ValorRegistro, (v) => v.parteDiario, { cascade: true })
+valoresRegistro: ValorRegistro[];
 }

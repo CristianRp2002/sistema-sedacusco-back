@@ -42,17 +42,21 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
-    if (updateUserDto.password) {
+    const { rol_id, ...userData } = updateUserDto;
+
+    if (userData.password) {
       const salt = await bcrypt.genSalt(10);
-      updateUserDto.password = await bcrypt.hash(updateUserDto.password, salt);
+      userData.password = await bcrypt.hash(userData.password, salt);
     } else {
-      delete updateUserDto.password;
+      delete userData.password;
     }
 
     const user = await this.userRepository.preload({
-      id: id,
-      ...updateUserDto,
+      id,
+      ...userData,
+      ...(rol_id ? { rol: { id: rol_id } as any } : {}),
     });
+
     if (!user) throw new NotFoundException('Usuario no encontrado');
     return this.userRepository.save(user);
   }

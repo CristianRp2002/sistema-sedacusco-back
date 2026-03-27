@@ -13,6 +13,9 @@ export class PdfController {
   @Get('parte/:id')
   async generarParte(@Param('id') id: string, @Res() res: Response) {
     const parte = await this.operacionesService.findOne(id);
+     console.log('VERIFICACIONES:', JSON.stringify(parte.verificacionesTablero, null, 2));
+    console.log('LECTURA INICIAL:', JSON.stringify(parte.lectura_inicial, null, 2));
+    console.log('TENSION LLEGADA:', JSON.stringify(parte.tension_llegada, null, 2));
     const html = this.pdfService.generarHtmlParte(parte);
     const pdf = await this.pdfService.generarPdf(html);
 

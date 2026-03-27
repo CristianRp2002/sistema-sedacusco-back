@@ -15,6 +15,10 @@ import { RolesModule } from './modules/roles/roles.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PdfModule } from './pdf/pdf.module';
 
+import { TipoActivo } from './modules/operaciones/entities/tipo-activo.entity';
+import { Activo } from './modules/operaciones/entities/activo.entity';
+import { RegistroActivo } from './modules/operaciones/entities/registro-activo.entity';
+
 @Module({
   imports: [
     PdfModule,

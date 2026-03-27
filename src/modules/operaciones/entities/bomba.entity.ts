@@ -15,7 +15,9 @@ export class Bomba {
   @Column({ type: 'varchar', length: 100, nullable: true })
   numero_serie: string;
 
-  @ManyToOne(() => Estacion, (estacion) => estacion.bombas)
+  @ManyToOne(() => Estacion, (estacion) => estacion.bombas, {
+    onDelete: 'CASCADE'
+  })
   estacion: Estacion;
 
 }

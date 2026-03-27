@@ -21,6 +21,12 @@ export class User {
 
   @Column({ type: 'boolean', default: true })
   activo: boolean;
+  
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  telefono: string | null;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  dni: string | null;
 
   // ==========================================
   // AQUÍ ESTÁ LA MAGIA DEL CASO 2 🔗

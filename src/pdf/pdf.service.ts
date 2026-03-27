@@ -7,13 +7,11 @@ export class PdfService implements OnModuleDestroy {
   private browser: Browser | null = null;
 
   private async getBrowser(): Promise<Browser> {
-    // Si el browser existe pero se cayó, lo limpiamos
     if (this.browser) {
       try {
-        const pages = await this.browser.pages();
+        await this.browser.pages();
         if (!this.browser.connected) throw new Error('disconnected');
       } catch {
-        // Browser muerto, lo reiniciamos
         this.browser = null;
       }
     }
@@ -30,7 +28,6 @@ export class PdfService implements OnModuleDestroy {
         ]
       });
 
-      // Si el browser se cierra inesperadamente, limpiamos la referencia
       this.browser.on('disconnected', () => {
         this.browser = null;
       });
@@ -52,55 +49,95 @@ export class PdfService implements OnModuleDestroy {
 
     try {
       await page.setContent(html, { waitUntil: 'domcontentloaded' });
+
+      await page.evaluate(() => new Promise(resolve => {
+        if (document.readyState === 'complete') {
+          resolve(null);
+        } else {
+          window.addEventListener('load', () => resolve(null));
+        }
+      }));
+
       const pdf = await page.pdf({
         format: 'A4',
         printBackground: true,
-        margin: { top: '18mm', right: '14mm', bottom: '18mm', left: '14mm' }
+        margin: { top: '18mm', right: '14mm', bottom: '18mm', left: '14mm' },
+        displayHeaderFooter: false,
       });
       return Buffer.from(pdf);
     } finally {
-      // Cierre seguro: ignora el error si la conexión ya estaba cerrada
       try { await page.close(); } catch {}
     }
   }
 
   generarHtmlParte(parte: any): string {
     const v = (val: any, suffix = '') => val != null && val !== '' ? `${val}${suffix}` : '—';
+
     const formatHora = (fecha: string) => {
       if (!fecha) return '—';
-      return new Date(fecha).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+      try {
+        return new Date(fecha).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+      } catch {
+        return fecha || '—';
+      }
     };
 
-    const fecha = new Date(parte.fecha_folio).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+    const formatFecha = (fecha: string) => {
+      if (!fecha) return '—';
+      try {
+        return new Date(fecha).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+      } catch {
+        return fecha || '—';
+      }
+    };
+
+    const fecha = formatFecha(parte.fecha_folio);
     const fechaCorta = new Date(parte.fecha_folio).toLocaleDateString('es-PE');
     const estacion = (parte.estacion?.nombre || '').toUpperCase();
 
+    // ✅ BOMBAS
     const bombas: string[] = [...new Set<string>(
       (parte.detallesBombeo?.map((b: any) => b.bomba?.nombre as string) || [])
-        .filter((nombre: any): nombre is string => !!nombre)
+        .filter((nombre: any): nombre is string => !!nombre && nombre.trim() !== '')
     )];
 
+    // ✅ OPERADORES
     const operadores: any[] = parte.operadores || [];
     const turnos = ['PRIMER TURNO', 'SEGUNDO TURNO', 'TERCER TURNO'];
+
+    // ✅ VERIFICACIONES
     const verificacionesHab = parte.verificacionesTablero?.filter((vt: any) => vt.momento === 'HABILITACION') || [];
     const verificacionesDes = parte.verificacionesTablero?.filter((vt: any) => vt.momento === 'DESACTIVACION') || [];
+
     const produccion = Number(parte.produccion_calculada || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const filasTableros = (verifs: any[]) => verifs.length > 0
-      ? verifs.map(vf => `
+    // ✅ FIX 1: filasTableros — infiere nombre del tablero cuando viene null
+    const filasTableros = (verifs: any[]) => {
+      if (verifs.length === 0) {
+        return `<tr><td colspan="6" class="center">Sin registros</td></tr>`;
+      }
+      return verifs.map((vf, i) => {
+        const nombreTablero = vf.tablero?.nombre ||
+          (i === 0 ? 'TABLERO GENERAL' : `TABLERO BOMBA ${i}`);
+        return `
           <tr>
-            <td>${vf.tablero?.nombre || '—'}</td>
+            <td>${nombreTablero}</td>
             <td class="center">${vf.interruptor_estado || '—'}</td>
             <td class="center">${vf.selector_estado || '—'}</td>
             <td class="center">${vf.parada_emergencia_estado || '—'}</td>
             <td class="center">${vf.variador_estado || '—'}</td>
             <td class="center">${vf.alarma_estado || '—'}</td>
-          </tr>`).join('')
-      : `<tr><td colspan="6" class="center">Sin registros</td></tr>`;
+          </tr>`;
+      }).join('');
+    };
 
+    // ✅ ENCABEZADOS bombas
     const encabezadosBombas = bombas.map(b => `<th colspan="4">${b.toUpperCase()}</th>`).join('');
     const subEncabezadosBombas = bombas.map(() => `<th>Enc.</th><th>Apag.</th><th>Hor. I</th><th>Hor. F</th>`).join('');
-    const getBombeos = (nombre: string) => parte.detallesBombeo?.filter((b: any) => b.bomba?.nombre === nombre) || [];
+
+    const getBombeos = (nombre: string) => {
+      return parte.detallesBombeo?.filter((b: any) => b.bomba?.nombre === nombre) || [];
+    };
 
     const maxFilas = Math.max(...bombas.map(b => getBombeos(b).length), 1);
 
@@ -113,16 +150,58 @@ export class PdfService implements OnModuleDestroy {
           <td class="right">${b ? (b.horometro_inicial ?? '—') : '—'}</td>
           <td class="right">${b ? (b.horometro_final ?? '—') : '—'}</td>`;
       }).join('');
-      const obs = bombas.length > 0 ? (getBombeos(bombas[0])[i]?.observacion || '') : '';
-      return `<tr><td class="center num">${String(i + 1).padStart(2, '0')}</td>${celdas}<td>${obs}</td></tr>`;
+
+      const obs = bombas.length > 0 && getBombeos(bombas[0])[i]
+        ? (getBombeos(bombas[0])[i]?.observacion || '')
+        : '';
+
+      return `<tr>
+        <td class="center num">${String(i + 1).padStart(2, '0')}</td>
+        ${celdas}
+        <td>${obs}</td>
+      </tr>`;
     }).join('');
 
+    // ✅ FIRMAS
     const firmasOperadores = operadores.map((op, i) => `
       <div class="firma-operador">
         <div class="turno-label">${turnos[i] || (i + 1) + '° TURNO'}</div>
         <div class="nombre-operador">${op.nombre_operador || ''}</div>
         <div class="linea-firma"></div>
       </div>`).join('');
+
+    // ✅ FIX 2: Sección VII — registrosActivo (observaciones_generales eliminado)
+    const tieneRegistros = (parte.registrosActivo?.length || 0) > 0;
+
+    const seccionRegistros = tieneRegistros ? `
+      <div class="seccion">
+        <div class="seccion-barra"></div>
+        <div class="seccion-texto">
+          <span class="seccion-num">VII.</span>
+          <span class="seccion-titulo">REGISTRO DE EQUIPOS Y ACTIVOS</span>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>EQUIPO / ACTIVO</th>
+            <th>TIPO</th>
+            <th>ESTADO</th>
+            <th>OBSERVACIÓN</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${parte.registrosActivo.map((r: any) => `
+            <tr>
+              <td>${r.activo?.nombre || r.nombre || '—'}</td>
+              <td class="center">${r.activo?.tipoActivo?.nombre || '—'}</td>
+              <td class="center">${r.estado || r.condicion || '—'}</td>
+              <td>${r.observacion || r.observaciones || ''}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` : '';
 
     return `<!DOCTYPE html>
 <html lang="es">
@@ -144,15 +223,13 @@ export class PdfService implements OnModuleDestroy {
   .header-fecha .label { font-size: 6pt; color: #BFDBFE; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
   .header-fecha .valor { font-size: 14pt; font-weight: 700; color: white; margin-top: 2px; }
 
-  .fecha-banda { background: #F8FAFC; border-bottom: 1px solid #E2E8F0; text-align: center; padding: 5px; font-size: 7pt; color: #64748B; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
-
-  .seccion { display: flex; align-items: center; gap: 10px; margin: 14px 0 7px 0; }
+  .seccion { display: flex; align-items: center; gap: 10px; margin: 14px 0 7px 0; page-break-inside: avoid; }
   .seccion-barra { width: 4px; height: 18px; background: #1A56A0; border-radius: 2px; flex-shrink: 0; }
   .seccion-texto { display: flex; align-items: center; gap: 5px; }
   .seccion-num { font-size: 8.5pt; font-weight: 700; color: #1E40AF; white-space: nowrap; }
   .seccion-titulo { font-size: 8.5pt; font-weight: 700; color: #0F172A; letter-spacing: 0.2px; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  table { width: 100%; border-collapse: collapse; font-size: 8pt; page-break-inside: avoid; }
   th { background: #F8FAFC; color: #64748B; font-size: 6.5pt; font-weight: 600; text-align: center; padding: 6px 5px; border: 0.25px solid #D1D5DB; letter-spacing: 0.3px; text-transform: uppercase; }
   td { border: 0.25px solid #D1D5DB; padding: 7px 6px; color: #0F172A; font-size: 8pt; }
   tr:nth-child(even) td { background: #FAFAFA; }
@@ -162,27 +239,27 @@ export class PdfService implements OnModuleDestroy {
 
   .td-produccion { background: #F0FDF4 !important; color: #15803D !important; font-size: 11pt !important; font-weight: 700 !important; text-align: right; border: 0.5px solid #BBF7D0 !important; padding: 6px 8px !important; }
 
-  .panel-row { display: flex; gap: 10px; align-items: flex-start; }
+  .panel-row { display: flex; gap: 10px; align-items: flex-start; page-break-inside: avoid; }
   .panel-tabla { flex: 1; }
   .panel-lateral { width: 88px; flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; }
   .panel-item { border: 0.25px solid #D1D5DB; }
   .panel-item-label { background: #F8FAFC; font-size: 6pt; font-weight: 600; color: #64748B; text-align: center; padding: 5px 4px; border-bottom: 0.25px solid #D1D5DB; text-transform: uppercase; letter-spacing: 0.3px; }
   .panel-item-valor { font-size: 9pt; font-weight: 600; color: #0F172A; text-align: center; padding: 9px 4px; }
 
-  .firmas-divider { border: none; border-top: 0.25px solid #D1D5DB; margin: 20px 0 16px 0; }
-  .firmas-container { display: flex; gap: 32px; align-items: flex-start; }
+  .firmas-divider { border: none; border-top: 0.25px solid #D1D5DB; margin: 20px 0 16px 0; page-break-inside: avoid; }
+  .firmas-container { display: flex; gap: 32px; align-items: flex-start; page-break-inside: avoid; }
   .firmas-operadores { flex: 1; }
   .firmas-supervisor { width: 170px; flex-shrink: 0; }
   .firma-titulo { font-size: 7.5pt; font-weight: 700; color: #0F172A; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
   .firma-titulo-barra { width: 4px; height: 14px; background: #1A56A0; border-radius: 2px; flex-shrink: 0; }
-  .firma-operador { margin-bottom: 10px; }
+  .firma-operador { margin-bottom: 10px; page-break-inside: avoid; }
   .turno-label { font-size: 6pt; font-weight: 700; color: #1E40AF; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
   .nombre-operador { font-size: 9.5pt; font-weight: 500; color: #0F172A; margin-bottom: 4px; }
   .linea-firma { border-bottom: 0.25px solid #D1D5DB; width: 140px; margin-top: 3px; }
   .sup-label { font-size: 6.5pt; color: #64748B; margin-bottom: 3px; }
   .sup-linea { border-bottom: 0.25px solid #D1D5DB; margin-bottom: 16px; }
 
-  .footer { margin-top: 24px;border-top: 0.25px solid #D1D5DB;padding-top: 5px;display: flex;  justify-content: space-between;  font-size: 6.5pt;  color: #94A3B8;}
+  .footer { margin-top: 24px; border-top: 0.25px solid #D1D5DB; padding-top: 5px; display: flex; justify-content: space-between; font-size: 6.5pt; color: #94A3B8; page-break-inside: avoid; }
 </style>
 </head>
 <body>
@@ -337,6 +414,8 @@ export class PdfService implements OnModuleDestroy {
       </div>
     </div>
   </div>
+
+  ${seccionRegistros}
 
   <hr class="firmas-divider">
   <div class="firmas-container">

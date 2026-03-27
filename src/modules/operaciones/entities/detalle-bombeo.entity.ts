@@ -5,10 +5,12 @@ import { Bomba } from './bomba.entity';
 @Entity('detalles_bombeo')
 export class DetalleBombeo {
   @PrimaryGeneratedColumn('uuid')
-  id: number;
+  id: string;
 
   //(Bomba 1, Bomba 2, o Bomba 3...)
-  @ManyToOne(() => Bomba)
+  @ManyToOne(() => Bomba, {
+    onDelete: 'CASCADE'
+  })
   bomba: Bomba;
 
   // TIMESTAMP para guardar fecha Y hora exacta
