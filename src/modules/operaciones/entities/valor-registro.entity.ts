@@ -12,7 +12,6 @@ export class ValorRegistro {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  // A qué parte diario pertenece este valor
   @ManyToOne(() => ParteDiario, (p) => p.valoresRegistro, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'parte_diario_id' })
   parteDiario: ParteDiario;
@@ -20,7 +19,6 @@ export class ValorRegistro {
   @Column({ type: 'uuid' })
   parte_diario_id: string;
 
-  // De qué equipo físico es este valor
   @ManyToOne(() => Activo, { eager: true })
   @JoinColumn({ name: 'activo_id' })
   activo: Activo;
@@ -28,7 +26,6 @@ export class ValorRegistro {
   @Column({ type: 'uuid' })
   activo_id: string;
 
-  // Qué campo está llenando el operador
   @ManyToOne(() => CampoTipoActivo, { eager: true })
   @JoinColumn({ name: 'campo_id' })
   campo: CampoTipoActivo;
@@ -36,8 +33,6 @@ export class ValorRegistro {
   @Column({ type: 'uuid' })
   campo_id: string;
 
-  // El valor que ingresó el operador — siempre texto
-  // En el frontend se convierte al tipo correcto según campo.tipo_input
   @Column({ type: 'text', nullable: true })
   valor: string;
 

@@ -13,8 +13,10 @@ import { UpdateOperacionesDto } from './dto/update-operaciones.dto';
 import { ParteDiario } from './entities/parte-diario.entity';
 import { DetalleBombeo } from './entities/detalle-bombeo.entity';
 import { TurnoOperador } from './entities/turno-operador.entity';
-import { VerificacionTablero } from './entities/verificacion-tablero.entity';
-import { RegistroActivo } from './entities/registro-activo.entity';
+
+import { VerificacionTablero } from './entities/verificacion-tablero.entity'; 
+import { RegistroActivo } from './entities/registro-activo.entity';           
+import { ValorRegistro } from './entities/valor-registro.entity';             
 
 // ════════════════
 // UTILIDADES
@@ -192,6 +194,7 @@ export class OperacionesService {
             horometro_inicial: b.horometro_inicial,
             horometro_final:   b.horometro_final,
             horas_bombeo:      horas,
+            observacion:       nullIfEmpty(b.observacion),
             numero_ciclo:      nullIfEmpty(b.numero_ciclo),
             dias_horas_ini:    nullIfEmpty(b.dias_horas_ini),
             dias_horas_fin:    nullIfEmpty(b.dias_horas_fin),
@@ -226,7 +229,7 @@ export class OperacionesService {
       // 8. GUARDAR REGISTROS DE ACTIVOS
       if (Array.isArray(registros_activo) && registros_activo.length > 0) {
         const registros = registros_activo.map((r) =>
-          queryRunner.manager.create(RegistroActivo, {
+          queryRunner.manager.create(ValorRegistro, {
             ...r,
             parte_diario_id: parteGuardado.id,
           })
@@ -380,6 +383,7 @@ export class OperacionesService {
             horometro_inicial: b.horometro_inicial,
             horometro_final:   b.horometro_final,
             horas_bombeo:      horas,
+              observacion:       nullIfEmpty(b.observacion),
             numero_ciclo:      nullIfEmpty(b.numero_ciclo),
             dias_horas_ini:    nullIfEmpty(b.dias_horas_ini),
             dias_horas_fin:    nullIfEmpty(b.dias_horas_fin),
@@ -548,6 +552,9 @@ export class OperacionesService {
         'registrosActivo',
         'registrosActivo.activo',
         'registrosActivo.activo.tipoActivo',
+        'valoresRegistro',           
+        'valoresRegistro.activo',    
+        'valoresRegistro.campo',     
       ],
     });
 

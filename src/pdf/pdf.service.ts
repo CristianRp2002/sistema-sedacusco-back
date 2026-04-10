@@ -171,37 +171,59 @@ export class PdfService implements OnModuleDestroy {
       </div>`).join('');
 
     // ✅ FIX 2: Sección VII — registrosActivo (observaciones_generales eliminado)
-    const tieneRegistros = (parte.registrosActivo?.length || 0) > 0;
+    const activosConValores = (() => {
+  const valores: any[] = parte.valoresRegistro || [];
+  const mapa = new Map<string, { nombre: string; tipo: string; campos: any[] }>();
+  
+  valores.forEach((v: any) => {
+    const activoId = v.activo_id;
+    if (!mapa.has(activoId)) {
+      mapa.set(activoId, {
+        nombre: v.activo?.nombre || '—',
+        tipo:   v.activo?.tipoActivo?.nombre || '—',
+        campos: []
+      });
+    }
+    mapa.get(activoId)!.campos.push({
+      etiqueta: v.campo?.etiqueta || v.campo?.nombre_campo || '—',
+      valor:    v.valor || '—',
+      unidad:   v.campo?.unidad || ''
+    });
+  });
+  
+  return Array.from(mapa.values());
+})();
 
-    const seccionRegistros = tieneRegistros ? `
-      <div class="seccion">
-        <div class="seccion-barra"></div>
-        <div class="seccion-texto">
-          <span class="seccion-num">VII.</span>
-          <span class="seccion-titulo">REGISTRO DE EQUIPOS Y ACTIVOS</span>
-        </div>
+const seccionRegistros = activosConValores.length > 0 ? `
+  <div class="seccion">
+    <div class="seccion-barra"></div>
+    <div class="seccion-texto">
+      <span class="seccion-num">VII.</span>
+      <span class="seccion-titulo">REGISTRO DE EQUIPOS Y ACTIVOS</span>
+    </div>
+  </div>
+  ${activosConValores.map(activo => `
+    <div style="margin-bottom: 8px;">
+      <div style="background:#F8FAFC; border:0.25px solid #D1D5DB; padding:5px 8px; font-weight:700; font-size:8pt; margin-bottom:0;">
+        ${activo.nombre} <span style="font-weight:400; color:#64748B;">(${activo.tipo})</span>
       </div>
       <table>
         <thead>
           <tr>
-            <th>EQUIPO / ACTIVO</th>
-            <th>TIPO</th>
-            <th>ESTADO</th>
-            <th>OBSERVACIÓN</th>
+            ${activo.campos.map((c: any) => `<th>${c.etiqueta}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
-          ${parte.registrosActivo.map((r: any) => `
-            <tr>
-              <td>${r.activo?.nombre || r.nombre || '—'}</td>
-              <td class="center">${r.activo?.tipoActivo?.nombre || '—'}</td>
-              <td class="center">${r.estado || r.condicion || '—'}</td>
-              <td>${r.observacion || r.observaciones || ''}</td>
-            </tr>
-          `).join('')}
+          <tr>
+            ${activo.campos.map((c: any) => `
+              <td class="center">${c.valor}${c.unidad ? ' ' + c.unidad : ''}</td>
+            `).join('')}
+          </tr>
         </tbody>
       </table>
-    ` : '';
+    </div>
+  `).join('')}
+` : '';
 
     return `<!DOCTYPE html>
 <html lang="es">
@@ -298,7 +320,7 @@ export class PdfService implements OnModuleDestroy {
     <tbody>
       <tr>
         <td class="center">${v(parte.interruptor_llegada_10kv_estado)}</td>
-        <td class="center">Temp: ${v(parte.transformador_temperatura, '°C')}</td>
+        <td class="center">${v(parte.transformador_temperatura, '°C')}</td>
         <td class="center">${v(parte.tension_llegada?.fase_R)}</td>
         <td class="center">${v(parte.tension_llegada?.fase_S)}</td>
         <td class="center">${v(parte.tension_llegada?.fase_T)}</td>
