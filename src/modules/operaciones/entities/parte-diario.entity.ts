@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn, Unique } from 'typeorm';
 import { Estacion } from './estacion.entity';
 import { DetalleBombeo } from './detalle-bombeo.entity';
 import { VerificacionTablero } from './verificacion-tablero.entity'
@@ -13,9 +13,13 @@ import { RegistroActivo } from './registro-activo.entity';
 import { ValorRegistro } from './valor-registro.entity';
 
 @Entity('partes_diarios')
+@Unique(['fecha_folio', 'estacion'])
 export class ParteDiario {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'int', default: 0 })
+  cambios_realizados: number;
 
   @Column({ type: 'date' })
   fecha_folio: string; 

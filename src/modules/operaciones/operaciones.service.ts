@@ -18,13 +18,8 @@ import { VerificacionTablero } from './entities/verificacion-tablero.entity';
 import { RegistroActivo } from './entities/registro-activo.entity';           
 import { ValorRegistro } from './entities/valor-registro.entity';             
 
-// ════════════════
 // UTILIDADES
-// ════════════════
 
-/**
- * Convierte string vacío a null para evitar campos vacíos en BD
- */
 function nullIfEmpty(value: any): any {
   if (value === '' || value === undefined) return null;
   return value;
@@ -61,9 +56,7 @@ function calcularHorasBombeoConSaltoDia(
   return { horas, requiereAlerta };
 }
 
-// ════════════════
 // SERVICIO
-// ════════════════
 
 @Injectable()
 export class OperacionesService {
@@ -72,6 +65,38 @@ export class OperacionesService {
     private readonly parteDiarioRepository: Repository<ParteDiario>,
     private readonly dataSource: DataSource,
   ) {}
+
+  async verificarParteExistente(estacionId: string, fecha: string | Date) {
+    const fechaStr =
+      fecha instanceof Date
+        ? fecha.toISOString().substring(0, 10)
+        : fecha.substring(0, 10);
+
+    const [anio, mes, dia] = fechaStr.split('-').map(Number);
+    
+    const inicioDiaStr = `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')} 00:00:00`;
+    const finDiaStr = `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')} 23:59:59`;
+
+    const parteExistente = await this.parteDiarioRepository.findOne({
+      where: {
+        estacion: { id: estacionId },
+        fecha_folio: Between(inicioDiaStr, finDiaStr) as any,
+      },
+    });
+
+    if (parteExistente) {
+      return {
+        existe: true,
+        parte: {
+          id: parteExistente.id,
+          cambios_realizados: parteExistente.cambios_realizados || 0,
+          fecha_folio: parteExistente.fecha_folio,
+        },
+      };
+    }
+
+    return { existe: false };
+  }
 
   // CREAR CON TRANSACCIÓN COMPLETA
   async create(createOperacionesDto: CreateOperacionesDto) {
@@ -88,6 +113,20 @@ export class OperacionesService {
         estacion_id,
         ...datosParte
       } = createOperacionesDto;
+
+      // ✅ VALIDACIÓN: Verificar si ya existe un parte para hoy
+      const verificacion = await this.verificarParteExistente(
+        estacion_id,
+        datosParte.fecha_folio
+      );
+
+      if (verificacion.existe) {
+        throw new BadRequestException(
+          `❌ Ya existe un parte diario para esta estación en la fecha ${datosParte.fecha_folio}. ` +
+          `Solo se permite un parte por estación por día. ` +
+          `Si deseas modificarlo, edita el parte existente (ID: ${verificacion.parte?.id}).`
+        );
+      }
 
       // 1. VALIDACIÓN PREVIA
       const totalizadorParaValidar =
@@ -173,7 +212,6 @@ export class OperacionesService {
             : new Date(datosParte.fecha_folio).toISOString().substring(0, 10);
 
         const bombeosEntities = bombeos.map((b) => {
-          // CORRECCIÓN: Parseo explícito a Number
           const { horas, requiereAlerta } = calcularHorasBombeoConSaltoDia(
             Number(b.horometro_inicial),
             Number(b.horometro_final),
@@ -271,6 +309,17 @@ export class OperacionesService {
 
       if (!parteExistente) {
         throw new NotFoundException(`El Parte Diario con ID ${id} no existe`);
+      }
+
+      // ✅ VALIDACIÓN: Verificar límite de cambios (máximo 3)
+      const LIMITE_CAMBIOS = 3;
+      const cambiosActuales = parteExistente.cambios_realizados || 0;
+
+      if (cambiosActuales >= LIMITE_CAMBIOS) {
+        throw new BadRequestException(
+          `❌ Has alcanzado el límite de ${LIMITE_CAMBIOS} cambios permitidos por día. ` +
+          `No se pueden realizar más modificaciones a este parte diario.`
+        );
       }
 
       const {
@@ -383,7 +432,7 @@ export class OperacionesService {
             horometro_inicial: b.horometro_inicial,
             horometro_final:   b.horometro_final,
             horas_bombeo:      horas,
-              observacion:       nullIfEmpty(b.observacion),
+            observacion:       nullIfEmpty(b.observacion),
             numero_ciclo:      nullIfEmpty(b.numero_ciclo),
             dias_horas_ini:    nullIfEmpty(b.dias_horas_ini),
             dias_horas_fin:    nullIfEmpty(b.dias_horas_fin),
@@ -430,11 +479,15 @@ export class OperacionesService {
         await queryRunner.manager.save(registros);
       }
 
+      // ✅ INCREMENTAR CONTADOR DE CAMBIOS
+      parteSaved.cambios_realizados = cambiosActuales + 1;
+      await queryRunner.manager.save(ParteDiario, parteSaved);
+
       await queryRunner.commitTransaction();
 
       return {
         status:  'success',
-        message: 'Parte Diario actualizado exitosamente',
+        message: `Parte Diario actualizado exitosamente (Cambio ${parteSaved.cambios_realizados}/${LIMITE_CAMBIOS})`,
         data:    parteSaved,
       };
 
@@ -473,12 +526,6 @@ export class OperacionesService {
         throw new NotFoundException(`El Parte Diario con ID ${id} no existe`);
       }
 
-      if (registro.detallesBombeo?.length > 0) {
-        throw new BadRequestException(
-          `No se puede eliminar: hay ${registro.detallesBombeo.length} bombeos registrados`
-        );
-      }
-
       await queryRunner.manager.remove(registro);
       await queryRunner.commitTransaction();
 
@@ -505,11 +552,10 @@ export class OperacionesService {
   async findAll(filtros?: { mes?: string; anio?: string; estacionId?: string }) {
     const where: any = {};
 
-    // Uso de strings para coincidir con la entidad (TypeORM)
     if (filtros?.mes && filtros?.anio) {
       const mes = filtros.mes.padStart(2, '0');
       const anio = filtros.anio;
-      const ultimoDia = new Date(Number(anio), Number(mes),0).getDate();
+      const ultimoDia = new Date(Number(anio), Number(mes), 0).getDate();
 
       where.fecha_folio = Between(`${anio}-${mes}-01`, `${anio}-${mes}-${ultimoDia}`);
     } else if (filtros?.anio) {
@@ -552,9 +598,9 @@ export class OperacionesService {
         'registrosActivo',
         'registrosActivo.activo',
         'registrosActivo.activo.tipoActivo',
-        'valoresRegistro',           
-        'valoresRegistro.activo',    
-        'valoresRegistro.campo',     
+        'valoresRegistro',
+        'valoresRegistro.activo',
+        'valoresRegistro.campo',
       ],
     });
 
@@ -563,7 +609,7 @@ export class OperacionesService {
     }
 
     return registro;
-    }
+  }
 
   // MÉTODOS PRIVADOS
 
@@ -582,18 +628,17 @@ export class OperacionesService {
         : fechaHoy.substring(0, 10);
 
     const [anio, mes, dia] = fechaStr.split('-').map(Number);
-    const fecha     = new Date(anio, mes - 1, dia);      // hora local
-    const fechaAyer = new Date(anio, mes - 1, dia - 1);  // ayer local
+    const fecha     = new Date(anio, mes - 1, dia);
+    const fechaAyer = new Date(anio, mes - 1, dia - 1);
 
     try {
-      // Formateamos como string para evitar errores con TypeORM si fecha_folio es string
       const inicioDiaAyerStr = `${fechaAyer.getFullYear()}-${String(fechaAyer.getMonth() + 1).padStart(2, '0')}-${String(fechaAyer.getDate()).padStart(2, '0')} 00:00:00`;
       const finDiaAyerStr = `${fechaAyer.getFullYear()}-${String(fechaAyer.getMonth() + 1).padStart(2, '0')}-${String(fechaAyer.getDate()).padStart(2, '0')} 23:59:59`;
 
       const parteAyer = await queryRunner.manager.findOne(ParteDiario, {
         where: {
           estacion:    { id: estacionId },
-          fecha_folio: Between(inicioDiaAyerStr, finDiaAyerStr) as any, 
+          fecha_folio: Between(inicioDiaAyerStr, finDiaAyerStr) as any,
         },
       });
 

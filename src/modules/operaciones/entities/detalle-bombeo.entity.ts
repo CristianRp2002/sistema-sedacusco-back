@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { ParteDiario } from './parte-diario.entity';
 import { Bomba } from './bomba.entity';
 
@@ -29,6 +29,10 @@ export class DetalleBombeo {
   @Column({ type: 'text', nullable: true })
   observacion: string;
 
-  @ManyToOne(() => ParteDiario, (parte) => parte.detallesBombeo)
+  @ManyToOne(() => ParteDiario, (parte) => parte.detallesBombeo, {
+    onDelete: 'CASCADE'
+  })
+
+  @JoinColumn({ name: 'parte_diario_id' })
   parteDiario: ParteDiario;
 }

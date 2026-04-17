@@ -7,13 +7,21 @@ import { UpdateOperacionesDto } from './dto/update-operaciones.dto';
 export class OperacionesController {
   constructor(private readonly operacionesService: OperacionesService) {}
 
+  @Get('verificar')
+  async verificarParteExistente(
+    @Query('estacion_id', new ParseUUIDPipe()) estacionId: string,
+    @Query('fecha') fecha: string,
+  ) {
+    return this.operacionesService.verificarParteExistente(estacionId, fecha);
+  }
+
   @Post()
   create(@Body() createOperacioneDto: CreateOperacionesDto) {
     return this.operacionesService.create(createOperacioneDto);
   }
 
   @Get()
-  findAll(
+  findAll(  
     @Query('mes') mes?: string,
     @Query('anio') anio?: string,
     @Query('estacion_id') estacionId?: string,
@@ -35,4 +43,6 @@ export class OperacionesController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.operacionesService.remove(id);
   }
+
+  
 }
