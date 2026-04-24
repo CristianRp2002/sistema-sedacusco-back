@@ -10,6 +10,13 @@ export enum TipoInput {
   TEXTO   = 'texto',
   BOOLEANO = 'booleano',
   FECHA   = 'fecha',
+  SELECTOR = 'selector',
+}
+export interface ConfigCampo {
+  min?:       number;    // Valor mínimo permitido
+  max?:       number;    // Valor máximo permitido
+  decimales?: number;    // Numero de decimales
+  opciones?:  string[];  // ['Encendido', 'Apagado', 'Falla']
 }
 
 @Entity('campos_tipo_activo')
@@ -48,6 +55,9 @@ export class CampoTipoActivo {
   // Unidad de medida opcional — ej: "m", "bar", "kg", "kWh"
   @Column({ type: 'varchar', length: 20, nullable: true })
   unidad: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  config?: ConfigCampo;
 
   @Column({ default: true })
   activo: boolean;

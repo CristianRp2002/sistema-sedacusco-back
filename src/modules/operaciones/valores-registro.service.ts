@@ -88,32 +88,60 @@ export class ValoresRegistroService {
     });
   }
 
-  // ── PRIVADOS ──────────────────────────────────────────────
-
+  // ── PRIVADOS ──────
   private async validarRequeridos(valores: {
     activo_id: string;
-    campo_id: string;
-    valor: string;
+    campo_id:  string;
+    valor:     string;
   }[]): Promise<void> {
-
-    // Obtener todos los campos requeridos de los activos enviados
     const campoIds = valores.map(v => v.campo_id);
-
     if (campoIds.length === 0) return;
 
-    const camposRequeridos = await this.campoRepo
+    const campos = await this.campoRepo
       .createQueryBuilder('c')
       .where('c.id IN (:...ids)', { ids: campoIds })
-      .andWhere('c.requerido = true')
       .getMany();
 
-    // Verificar que cada campo requerido tenga valor
-    for (const campo of camposRequeridos) {
-      const valorEnviado = valores.find(v => v.campo_id === campo.id);
-      if (!valorEnviado || valorEnviado.valor === '' || valorEnviado.valor === null) {
+    for (const campo of campos) {
+      const envio = valores.find(v => v.campo_id === campo.id);
+      const valor = envio?.valor;
+
+      // 1. Validar requerido
+      if (campo.requerido && (!valor || valor === '')) {
         throw new BadRequestException(
           `El campo "${campo.etiqueta}" es requerido y no tiene valor`
         );
+      }
+
+      if (!valor || valor === '') continue; // vacío pero no requerido → ok
+
+      // 2. Validar rangos para números
+      if (campo.tipo_input === 'numero' && campo.config) {
+        const num = parseFloat(valor);
+        if (isNaN(num)) {
+          throw new BadRequestException(
+            `El campo "${campo.etiqueta}" debe ser un número`
+          );
+        }
+        if (campo.config.min !== undefined && num < campo.config.min) {
+          throw new BadRequestException(
+            `"${campo.etiqueta}" no puede ser menor a ${campo.config.min}${campo.unidad ? ' ' + campo.unidad : ''}`
+          );
+        }
+        if (campo.config.max !== undefined && num > campo.config.max) {
+          throw new BadRequestException(
+            `"${campo.etiqueta}" no puede ser mayor a ${campo.config.max}${campo.unidad ? ' ' + campo.unidad : ''}`
+          );
+        }
+      }
+
+      // 3. Validar que el valor esté entre las opciones del selector
+      if (campo.tipo_input === 'selector' && campo.config?.opciones) {
+        if (!campo.config.opciones.includes(valor)) {
+          throw new BadRequestException(
+            `"${campo.etiqueta}": valor inválido. Opciones: ${campo.config.opciones.join(', ')}`
+          );
+        }
       }
     }
   }

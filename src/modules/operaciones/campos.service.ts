@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CampoTipoActivo, TipoInput } from './entities/campo-tipo-activo.entity';
+import { CampoTipoActivo, TipoInput, ConfigCampo } from './entities/campo-tipo-activo.entity';
 import { TipoActivo } from './entities/tipo-activo.entity';
 
 @Injectable()
@@ -38,9 +38,13 @@ export class CamposService {
     etiqueta: string;
     tipo_input: TipoInput;
     requerido: boolean;
-    orden: number;
+    orden: number;    
     unidad?: string;
+    config?: ConfigCampo; 
   }): Promise<CampoTipoActivo> {
+    // Validar config antes de crear
+    this.validarConfigCampo(datos.tipo_input, datos.config);
+    
     const campo = this.campoRepo.create(datos);
     return this.campoRepo.save(campo);
   }
@@ -49,8 +53,47 @@ export class CamposService {
   async actualizar(id: string, datos: Partial<CampoTipoActivo>): Promise<CampoTipoActivo> {
     const campo = await this.campoRepo.findOne({ where: { id } });
     if (!campo) throw new NotFoundException(`Campo ${id} no encontrado`);
+    
+    if (datos.tipo_input || datos.config) {
+      const tipoFinal   = datos.tipo_input ?? campo.tipo_input;
+      const configFinal = datos.config     ?? campo.config;
+      this.validarConfigCampo(tipoFinal, configFinal);
+    }
+    
     Object.assign(campo, datos);
     return this.campoRepo.save(campo);
+  }
+
+  private validarConfigCampo(tipo: TipoInput, config?: ConfigCampo): void {
+    if (!config) return;
+
+    if (tipo === TipoInput.SELECTOR) {
+      if (!config.opciones || config.opciones.length < 2) {
+        throw new BadRequestException(
+          'Un campo tipo selector debe tener al menos 2 opciones'
+        );
+      }
+    }
+
+    if (tipo === TipoInput.NUMERO) {
+      if (config.min !== undefined && config.max !== undefined) {
+        if (config.min >= config.max) {
+          throw new BadRequestException(
+            `El valor mínimo (${config.min}) debe ser menor al máximo (${config.max})`
+          );
+        }
+      }
+      if (config.decimales !== undefined && config.decimales < 0) {
+        throw new BadRequestException('Los decimales no pueden ser negativos');
+      }
+    }
+
+    // opciones no tiene sentido en campos que no sean selector
+    if (tipo !== TipoInput.SELECTOR && config.opciones) {
+      throw new BadRequestException(
+        `Solo los campos tipo selector pueden tener opciones`
+      );
+    }
   }
 
   // Eliminar campo
