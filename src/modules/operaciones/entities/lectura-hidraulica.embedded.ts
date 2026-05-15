@@ -2,7 +2,7 @@ import { Column } from 'typeorm';
 
 export class LecturaHidraulica {
   
-  @Column({ type: 'time', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   hora_registro: string; 
 
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
