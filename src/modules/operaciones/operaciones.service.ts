@@ -186,6 +186,7 @@ export class OperacionesService {
         ...datosLimpios,
         produccion_calculada: produccionCalculada,
         estacion: { id: estacion_id } as any,
+        estado: 'INICIAL',
       });
       const parteGuardado = await queryRunner.manager.save(ParteDiario, nuevoParte);
 
@@ -381,6 +382,12 @@ export class OperacionesService {
       if (!parteActualizado) {
         throw new NotFoundException(`No se encontró el registro ${id}`);
       }
+
+      if (datosLimpios.finalHora_registro || datosAActualizar.lectura_final?.hora_registro) {
+          parteActualizado.estado = 'COMPLETO';
+        }
+
+    
 
       const parteSaved = await queryRunner.manager.save(ParteDiario, parteActualizado);
 

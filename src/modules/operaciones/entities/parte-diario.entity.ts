@@ -21,6 +21,9 @@ export class ParteDiario {
   @Column({ type: 'int', default: 0 })
   cambios_realizados: number;
 
+  @Column({ type: 'varchar', length: 20, default: 'INICIAL' })
+  estado: 'INICIAL' | 'COMPLETO';
+
   @Column({ type: 'date' })
   fecha_folio: string; 
 
