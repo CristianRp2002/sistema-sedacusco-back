@@ -1,19 +1,23 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { EstacionesService } from './estaciones.service'; // 👈 Importamos al cocinero
+import { EstacionesService } from './estaciones.service'; 
 
 @Controller('estaciones')
 @UseGuards(AuthGuard('jwt'))
 export class EstacionesController {
   
-  // 👈 Solo inyectamos el servicio, NADA de repositorios aquí
   constructor(private readonly estacionesService: EstacionesService) {} 
+
+  @Get(':id')
+    findOne(@Param('id') id: string) {
+      return this.estacionesService.findOne(id);
+    }
 
   @Get()
   findAll() {
     return this.estacionesService.findAll();
   }
-
+  
   @Post()
   crear(@Body() body: { nombre: string }) {
     return this.estacionesService.crear(body);

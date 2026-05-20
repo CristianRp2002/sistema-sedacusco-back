@@ -49,6 +49,41 @@ export class EstacionesService {
     }
     return estaciones;
   }
+  async findOne(id: string) {
+    const estacion = await this.estacionRepo.findOne({
+      where: { id },
+      relations: [
+        'bombas',
+        'tableros',
+        'activos',
+        'activos.tipoActivo',
+        'activos.tipoActivo.campos',
+      ],
+    });
+
+    if (!estacion) return null;
+
+    const ultimoParte = await this.parteDiarioRepo.findOne({
+      where: { estacion: { id: estacion.id } },
+      order: { fecha_folio: 'DESC' },
+    });
+
+    (estacion as any).ultimo_totalizador = ultimoParte
+      ? Number(ultimoParte.totalizador_final)
+      : null;
+
+    for (const bomba of estacion.bombas ?? []) {
+      const ultimoRegistro = await this.registroRepo.findOne({
+        where: { bomba: { id: bomba.id } },
+        order: { id: 'DESC' },
+      });
+      (bomba as any).ultimo_horometro = ultimoRegistro
+        ? ultimoRegistro.horometro_final
+        : 0;
+    }
+
+    return estacion;
+  }
 
   crear(body: { nombre: string }) {
     const estacion = this.estacionRepo.create(body);
