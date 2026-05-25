@@ -384,10 +384,11 @@ export class OperacionesService {
       }
 
       if (datosLimpios.finalHora_registro || datosAActualizar.lectura_final?.hora_registro) {
-          parteActualizado.estado = 'COMPLETO';
-        }
-
-    
+        parteActualizado.estado = 'COMPLETO';
+      } else {
+        parteActualizado.estado = 'INICIAL';
+      }
+          
 
       const parteSaved = await queryRunner.manager.save(ParteDiario, parteActualizado);
 
